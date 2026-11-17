@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ .Site.Title }} — STUN and TURN in pure Go, for peers that cannot reach each other</title>
+<meta name="description" content="STUN and TURN in pure Go: a relay for WebRTC peers behind a symmetric NAT, a full-tunnel VPN or a network that only lets HTTPS out, ephemeral credentials behind an OpenID Connect login, and a rendezvous so two peers meet with one link.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+{{ partial "styles.html" . }}
+{{/* The page's own rules for what <main> holds, kept for it alone (class legacy),
+     its colours read from the kit's tokens. */}}
+<style>
+.legacy{--fg:var(--ink);--muted:var(--slate);--card:var(--bg-soft);--border:var(--line)}
+.legacy .lead{color: var(--fg); max-width: 800px; margin: 8px auto 0; text-align: center;}
+.legacy h2.section{text-align: center; margin: 40px 0 4px; font-size: 1.4rem;}
+.legacy .grid{display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; padding: 16px 0 8px;}
+.legacy .card{background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column;}
+.legacy .card h3{margin: 0 0 .35em; font-size: 1.2rem; display: flex; align-items: center; justify-content: space-between;}
+.legacy .card h3 a{text-decoration: none;}
+.legacy .card .accel{color: var(--muted); font-size: .85rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin: 0 0 .6em;}
+.legacy .card p{margin: 0 0 .8em; color: var(--fg); font-size: .95rem;}
+.legacy .card .badges{margin-top: auto;}
+.legacy .card .badges img{height: 20px; vertical-align: middle;}
+.legacy .type{font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border);}
+.legacy .type.lib{color: var(--accent); border-color: var(--accent);}
+.legacy .type.cli{color: var(--accent-fg); background: var(--accent); border-color: var(--accent);}
+.legacy .principles{color: var(--muted); text-align: center; padding: 10px 0 0; max-width: 820px; margin: 0 auto;}
+</style>
+</head>
+<body class="lm">
+  <header class="nav"><div class="wrap">
+    <a class="brand" href="/"><img class="glyph" src="/img/logo.svg" width="32" height="32" alt="go-turn logo"> {{ .Site.Title }}</a>
+    {{ partial "theme-toggle.html" . }}
+  </div></header>
+  {{ partial "fork-ribbon.html" "https://github.com/go-turn" }}
+
+  <div class="hero"><div class="wrap">
+    <div>
+      <h1 class="head">go-turn</h1>
+      <p class="sub"><strong>STUN and TURN</strong> for WebRTC peers that cannot reach each other
+      directly — a symmetric NAT, a full-tunnel VPN, a network that only lets HTTPS out — as one
+      daemon, <code>turnd</code>, on one host.</p>
+      {{/* [[params.cta]] in hugo.toml: the kit renders the row */}}
+      {{ partial "cta.html" . }}
+      <div class="trust"><span class="pill">STUN Binding · RFC 8489</span><span class="pill">TURN · RFC 8656</span><span class="pill">UDP, TCP or TLS on 443</span><span class="pill">credentials behind an OpenID Connect login</span><span class="pill">gRPC rendezvous over WebSocket</span><span class="pill">PROXY protocol v2</span><span class="pill">fuzzed decoders</span></div>
+    </div>
+    {{ partial "hero-carousel.html" . }}
+  </div></div>
+
+  {{ with .Site.Params.repos }}<div class="strip"><div class="wrap">
+    <span class="lead-line">One organisation, <b>{{ len . }}</b> repository of code</span>
+    <div class="mods">{{ range . }}<a href="#repos">{{ .name }}</a>{{ end }}</div>
+  </div></div>{{ end }}
+
+  <main id="repos" class="legacy"><div class="wrap">
+    <p class="lead">Two WebRTC peers sometimes cannot open a connection to one another, and
+      something on the public Internet has to carry the traffic. <strong>turnd</strong> is that
+      something: it answers STUN, relays TURN, mints short-lived credentials only after an
+      OpenID Connect login through <a href="https://github.com/go-authn">go-authn</a>, and
+      runs a rendezvous, so a host opens a room, shares one link, and the guest's answer comes
+      back on its own.</p>
+
+    <p class="lead">It is the relay the <a href="https://go-tex.github.io/playground/">go-tex
+      playground</a> uses for live collaboration over
+      <a href="https://github.com/go-crdt/collab">go-crdt/collab</a>.</p>
+
+    <h2 class="section">Repositories</h2>
+    <section class="grid">
+      {{ range .Site.Params.repos }}
+      <article class="card">
+        <h3>
+          <a href="https://github.com/go-turn/{{ .name }}"><code>{{ .name }}</code></a>
+          <span class="tags"><span class="type {{ .type }}">{{ .type }}</span></span>
+        </h3>
+        <p class="accel">{{ .what }}</p>
+        <p class="arch" style="font-size:.85rem;font-weight:600;margin:.3rem 0 0;color:var(--accent)">{{ .proof }}</p>
+        <p>{{ .result }}</p>
+        <div class="badges">
+          <a href="https://github.com/go-turn/{{ .name }}/actions/workflows/ci.yml"><img src="https://github.com/go-turn/{{ .name }}/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+        </div>
+      </article>
+      {{ end }}
+    </section>
+
+    <h2 class="section">A leaked room link lets a stranger knock, not enter</h2>
+    <p class="principles">A guest who joins a room is <strong>pending</strong>: it can only
+      receive. It cannot send, cannot get credentials, and counts against a separate pending cap
+      and a pending TTL. The host sees the knock and decides; only an admitted guest produces a
+      join and is charged to the host's room. The relay itself refuses to carry traffic to
+      loopback, private, link-local or its own addresses, except between two clients' relayed
+      ports, so the host's SSH, HTTPS and TURN listeners stay unreachable through it.</p>
+    </div></main>
+
+  <footer><div class="wrap"><span>{{ if not (partial "mantra-on.html" $) }}BSD-3-Clause · {{ end }}<a href="https://github.com/go-turn">github.com/go-turn</a> ·
+    credentials by <a href="https://github.com/go-authn">go-authn</a></span>{{ partial "kit-version.html" . }}</div></footer>
+</body>
+</html>

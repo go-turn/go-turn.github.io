@@ -1,0 +1,97 @@
+# Build the Hugo site on every pull request, and deploy it on every push to main.
+# Adapted from the official Hugo template at
+# https://gohugo.io/host-and-deploy/host-on-github-pages/.
+
+name: Deploy Hugo site to Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Allow only one concurrent deployment, skipping runs queued between the run
+# in-progress and latest queued. Don't cancel in-progress runs — we want them to
+# finish before a new build replaces them. A pull request gets a group of its
+# own, so a check on a branch never queues behind a deployment of main.
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+# Only the deployment needs to write anything; a pull-request build reads.
+permissions:
+  contents: read
+
+env:
+  # Pin Hugo so site builds don't break when a new release ships
+  # incompatible template changes. Bump deliberately, not by
+  # surprise.
+  HUGO_VERSION: 0.135.0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Hugo CLI
+        run: |
+          wget -O hugo.deb "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-amd64.deb"
+          sudo dpkg -i hugo.deb
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # Hugo resolves the landingkit module (hugo.toml [module]) with the go
+      # command, at the version go.mod pins.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      # Pages is only configured for what is going to be published. A pull
+      # request is checking that the site builds, which needs no base URL and
+      # no Pages permissions.
+      - name: Setup Pages
+        id: pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v6
+
+      - name: Build
+        if: github.event_name != 'pull_request'
+        env:
+          HUGO_ENVIRONMENT: production
+          HUGO_ENV: production
+        run: |
+          hugo \
+            --gc \
+            --minify \
+            --baseURL "${{ steps.pages.outputs.base_url }}/"
+
+      - name: Build (pull request)
+        if: github.event_name == 'pull_request'
+        env:
+          HUGO_ENVIRONMENT: production
+          HUGO_ENV: production
+        run: hugo --gc --minify
+
+      - name: Upload artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ./public
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
